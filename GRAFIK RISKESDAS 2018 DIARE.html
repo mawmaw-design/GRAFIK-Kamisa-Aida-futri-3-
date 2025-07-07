@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grafik Interaktif Prevalensi Diare (Riskesdas 2018)</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Chart.js untuk membuat grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Memuat plugin anotasi untuk Chart.js (untuk garis rata-rata) -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <!-- Memuat Font (Poppins & Pacifico) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+        background-color: #fff7f9; /* Latar belakang pink sangat muda */
+      }
+      .title-font {
+        font-family: "Pacifico", cursive;
+      }
+      .control-btn {
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #ffacc7; /* Border pink */
+        color: #c73e72;
+      }
+      .control-btn:hover {
+        background-color: #ffacc7;
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 172, 199, 0.4);
+      }
+      .control-btn.active {
+        background-color: #ff66a1;
+        color: white;
+        font-weight: 600;
+        border-color: #ff66a1;
+        box-shadow: 0 4px 12px rgba(255, 102, 161, 0.5);
+      }
+    </style>
+  </head>
+  <body class="flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+    <div
+      class="w-full max-w-7xl bg-white bg-opacity-80 backdrop-blur-sm border border-pink-200 rounded-2xl shadow-xl shadow-pink-500/10 p-4 sm:p-6 lg:p-8"
+    >
+      <!-- Judul Utama -->
+      <div class="text-center mb-6">
+        <h1 class="text-3xl sm:text-4xl font-bold text-pink-500 title-font">
+          Kondisi Kesehatan Daerah
+        </h1>
+        <p class="text-md text-gray-500 mt-2">
+          Prevalensi Diare menurut Provinsi (Riskesdas 2018)
+        </p>
+      </div>
+
+      <!-- Kontrol Interaktif -->
+      <div class="flex flex-wrap justify-center gap-3 sm:gap-4 mb-6">
+        <!-- Kontrol Penyortiran -->
+        <div
+          class="flex flex-wrap justify-center items-center gap-2 bg-pink-50 p-2 rounded-full border border-pink-200"
+        >
+          <span class="text-sm font-semibold text-pink-700 self-center mx-2"
+            >Urutkan:</span
+          >
+          <button
+            id="sort-desc"
+            class="control-btn active text-sm px-4 py-1.5 rounded-full"
+          >
+            Tertinggi
+          </button>
+          <button
+            id="sort-asc"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Terendah
+          </button>
+          <button
+            id="sort-alpha"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Abjad (A-Z)
+          </button>
+        </div>
+        <!-- Kontrol Filter Pulau -->
+        <div
+          class="flex flex-wrap justify-center items-center gap-2 bg-pink-50 p-2 rounded-full border border-pink-200"
+        >
+          <span class="text-sm font-semibold text-pink-700 self-center mx-2"
+            >Filter:</span
+          >
+          <button
+            data-filter="Semua"
+            class="control-btn active text-sm px-4 py-1.5 rounded-full"
+          >
+            Semua
+          </button>
+          <button
+            data-filter="Sumatra"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Sumatra
+          </button>
+          <button
+            data-filter="Jawa"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Jawa
+          </button>
+          <button
+            data-filter="Kalimantan"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Kalimantan
+          </button>
+          <button
+            data-filter="Sulawesi"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Sulawesi
+          </button>
+          <button
+            data-filter="Nusa Tenggara & Bali"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Bali & NT
+          </button>
+          <button
+            data-filter="Maluku & Papua"
+            class="control-btn text-sm px-4 py-1.5 rounded-full"
+          >
+            Maluku & Papua
+          </button>
+        </div>
+      </div>
+
+      <!-- Area untuk menempatkan grafik -->
+      <div class="relative h-[700px]">
+        <canvas id="myBarChart"></canvas>
+      </div>
+
+      <!-- Catatan Kaki -->
+      <div class="text-center mt-6">
+        <p class="text-xs text-gray-400">
+          Sumber Data: Riset Kesehatan Dasar (Riskesdas) 2018
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // --- 1. PERSIAPAN DATA (Riskesdas 2018 - Prevalensi Diare) ---
+      const rataRataNasional = 8.0;
+
+      const allData = [
+        { provinsi: "Aceh", persentase: 9.1, pulau: "Sumatra" },
+        { provinsi: "Sumatera Utara", persentase: 9.1, pulau: "Sumatra" },
+        { provinsi: "Sumatera Barat", persentase: 9.3, pulau: "Sumatra" },
+        { provinsi: "Riau", persentase: 7.5, pulau: "Sumatra" },
+        { provinsi: "Jambi", persentase: 4.5, pulau: "Sumatra" },
+        { provinsi: "Sumatera Selatan", persentase: 5.5, pulau: "Sumatra" },
+        { provinsi: "Bengkulu", persentase: 9.4, pulau: "Sumatra" },
+        { provinsi: "Lampung", persentase: 4.9, pulau: "Sumatra" },
+        { provinsi: "Bangka Belitung", persentase: 4.4, pulau: "Sumatra" },
+        { provinsi: "Kepulauan Riau", persentase: 4.3, pulau: "Sumatra" },
+        { provinsi: "DKI Jakarta", persentase: 7.2, pulau: "Jawa" },
+        { provinsi: "Jawa Barat", persentase: 8.6, pulau: "Jawa" },
+        { provinsi: "Jawa Tengah", persentase: 8.4, pulau: "Jawa" },
+        { provinsi: "D.I. Yogyakarta", persentase: 8.5, pulau: "Jawa" },
+        { provinsi: "Jawa Timur", persentase: 7.6, pulau: "Jawa" },
+        { provinsi: "Banten", persentase: 9.2, pulau: "Jawa" },
+        { provinsi: "Bali", persentase: 8.3, pulau: "Nusa Tenggara & Bali" },
+        {
+          provinsi: "Nusa Tenggara Barat",
+          persentase: 10.2,
+          pulau: "Nusa Tenggara & Bali",
+        },
+        {
+          provinsi: "Nusa Tenggara Timur",
+          persentase: 6.6,
+          pulau: "Nusa Tenggara & Bali",
+        },
+        { provinsi: "Kalimantan Barat", persentase: 8.7, pulau: "Kalimantan" },
+        { provinsi: "Kalimantan Tengah", persentase: 5.5, pulau: "Kalimantan" },
+        {
+          provinsi: "Kalimantan Selatan",
+          persentase: 6.5,
+          pulau: "Kalimantan",
+        },
+        { provinsi: "Kalimantan Timur", persentase: 6.1, pulau: "Kalimantan" },
+        { provinsi: "Kalimantan Utara", persentase: 7.7, pulau: "Kalimantan" },
+        { provinsi: "Sulawesi Utara", persentase: 6.7, pulau: "Sulawesi" },
+        { provinsi: "Sulawesi Tengah", persentase: 10.3, pulau: "Sulawesi" },
+        { provinsi: "Sulawesi Selatan", persentase: 9.2, pulau: "Sulawesi" },
+        { provinsi: "Sulawesi Tenggara", persentase: 6.9, pulau: "Sulawesi" },
+        { provinsi: "Gorontalo", persentase: 8.8, pulau: "Sulawesi" },
+        { provinsi: "Sulawesi Barat", persentase: 8.4, pulau: "Sulawesi" },
+        { provinsi: "Maluku", persentase: 6.6, pulau: "Maluku & Papua" },
+        { provinsi: "Maluku Utara", persentase: 5.4, pulau: "Maluku & Papua" },
+        { provinsi: "Papua Barat", persentase: 7.8, pulau: "Maluku & Papua" },
+        { provinsi: "Papua", persentase: 9.4, pulau: "Maluku & Papua" },
+      ];
+
+      let currentData = [...allData];
+
+      // --- 2. KONFIGURASI GRAFIK ---
+      const ctx = document.getElementById("myBarChart").getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, 800, 0);
+      gradient.addColorStop(0, "rgba(255, 172, 199, 0.8)"); // Soft Pink
+      gradient.addColorStop(1, "rgba(255, 102, 161, 0.8)"); // Stronger Pink
+
+      const hoverGradient = ctx.createLinearGradient(0, 0, 800, 0);
+      hoverGradient.addColorStop(0, "rgba(255, 172, 199, 1)");
+      hoverGradient.addColorStop(1, "rgba(255, 102, 161, 1)");
+
+      const chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Prevalensi Diare (%)",
+              data: [],
+              backgroundColor: gradient,
+              borderColor: "rgba(255, 102, 161, 1)",
+              borderWidth: 1,
+              borderRadius: 6,
+              hoverBackgroundColor: hoverGradient,
+              hoverBorderColor: "rgba(199, 62, 114, 1)",
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: "y",
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: "Prevalensi (%)",
+                color: "#888",
+                font: {
+                  size: 14,
+                  family: "'Poppins', sans-serif",
+                  weight: "600",
+                },
+              },
+              grid: { color: "#fce4ec" },
+              ticks: {
+                color: "#6b7280",
+                font: { size: 12, family: "'Poppins', sans-serif" },
+              },
+            },
+            y: {
+              grid: { display: false },
+              ticks: {
+                color: "#374151",
+                font: { size: 11, family: "'Poppins', sans-serif" },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "rgba(255, 255, 255, 0.9)",
+              titleColor: "#C73E72",
+              bodyColor: "#555",
+              titleFont: {
+                family: "'Poppins', sans-serif",
+                size: 14,
+                weight: "bold",
+              },
+              bodyFont: { family: "'Poppins', sans-serif", size: 12 },
+              borderColor: "#FFACC7",
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (context) => `Prevalensi: ${context.raw.toFixed(1)}%`,
+              },
+            },
+            annotation: {
+              annotations: {
+                line1: {
+                  type: "line",
+                  xMin: rataRataNasional,
+                  xMax: rataRataNasional,
+                  borderColor: "#E91E63",
+                  borderWidth: 2,
+                  borderDash: [6, 6],
+                  label: {
+                    content: `Rata-rata Nasional (${rataRataNasional}%)`,
+                    display: true,
+                    position: "end",
+                    backgroundColor: "rgba(233, 30, 99, 0.8)",
+                    color: "#ffffff",
+                    font: { family: "'Poppins', sans-serif", weight: "bold" },
+                    yAdjust: -15,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // --- 3. FUNGSI INTERAKTIF ---
+      function updateChart(data) {
+        chart.data.labels = data.map((d) => d.provinsi);
+        chart.data.datasets[0].data = data.map((d) => d.persentase);
+        chart.update();
+      }
+
+      function setActiveButton(groupSelector, button) {
+        document
+          .querySelectorAll(groupSelector)
+          .forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+      }
+
+      document.getElementById("sort-desc").addEventListener("click", (e) => {
+        currentData.sort((a, b) => b.persentase - a.persentase);
+        updateChart(currentData);
+        setActiveButton('[id^="sort-"]', e.target);
+      });
+
+      document.getElementById("sort-asc").addEventListener("click", (e) => {
+        currentData.sort((a, b) => a.persentase - b.persentase);
+        updateChart(currentData);
+        setActiveButton('[id^="sort-"]', e.target);
+      });
+
+      document.getElementById("sort-alpha").addEventListener("click", (e) => {
+        currentData.sort((a, b) => a.provinsi.localeCompare(b.provinsi));
+        updateChart(currentData);
+        setActiveButton('[id^="sort-"]', e.target);
+      });
+
+      document.querySelectorAll("[data-filter]").forEach((button) => {
+        button.addEventListener("click", (e) => {
+          const filter = e.target.getAttribute("data-filter");
+          if (filter === "Semua") {
+            currentData = [...allData];
+          } else {
+            currentData = allData.filter((d) => d.pulau === filter);
+          }
+          const activeSortButton = document.querySelector(
+            '[id^="sort-"].active'
+          );
+          if (activeSortButton) {
+            activeSortButton.click();
+          } else {
+            currentData.sort((a, b) => b.persentase - a.persentase);
+            updateChart(currentData);
+          }
+          setActiveButton("[data-filter]", e.target);
+        });
+      });
+
+      // --- 4. INISIALISASI GRAFIK ---
+      document.getElementById("sort-desc").click();
+    </script>
+  </body>
+</html>
